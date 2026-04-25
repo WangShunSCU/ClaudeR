@@ -1,28 +1,33 @@
 # --- Discovery File System ---
 # Allows Python MCP servers to discover active R sessions dynamically.
+# Resolved at call time so each user gets their own home directory, even when
+# the package was installed system-wide by a different account (e.g. root on
+# RStudio Server).
 
-DISCOVERY_DIR <- file.path(path.expand("~"), ".claude_r_sessions")
+discovery_dir <- function() file.path(path.expand("~"), ".claude_r_sessions")
 
 write_discovery_file <- function(session_name, port) {
-  if (!dir.exists(DISCOVERY_DIR)) dir.create(DISCOVERY_DIR, recursive = TRUE)
+  d <- discovery_dir()
+  if (!dir.exists(d)) dir.create(d, recursive = TRUE)
   info <- list(
     session_name = session_name,
     port = port,
     pid = Sys.getpid(),
     started_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S")
   )
-  jsonlite::write_json(info, file.path(DISCOVERY_DIR, paste0(session_name, ".json")),
+  jsonlite::write_json(info, file.path(d, paste0(session_name, ".json")),
                        auto_unbox = TRUE, pretty = TRUE)
 }
 
 remove_discovery_file <- function(session_name) {
-  f <- file.path(DISCOVERY_DIR, paste0(session_name, ".json"))
+  f <- file.path(discovery_dir(), paste0(session_name, ".json"))
   if (file.exists(f)) file.remove(f)
 }
 
 cleanup_stale_discovery_files <- function() {
-  if (!dir.exists(DISCOVERY_DIR)) return(invisible(NULL))
-  files <- list.files(DISCOVERY_DIR, pattern = "\\.json$", full.names = TRUE)
+  d <- discovery_dir()
+  if (!dir.exists(d)) return(invisible(NULL))
+  files <- list.files(d, pattern = "\\.json$", full.names = TRUE)
   for (f in files) {
     tryCatch({
       info <- jsonlite::fromJSON(f)
